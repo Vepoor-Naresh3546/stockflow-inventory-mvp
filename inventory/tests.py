@@ -157,6 +157,75 @@ class ProductPageTests(TestCase):
         self.assertContains(response, reverse("product_edit", args=[Product.objects.get(sku="MY-1").pk]))
         self.assertContains(response, reverse("product_delete", args=[Product.objects.get(sku="MY-1").pk]))
 
+    def test_product_list_displays_low_stock_using_item_or_organization_threshold(self):
+        self.organization.default_low_stock_threshold = 5
+        self.organization.save(update_fields=["default_low_stock_threshold"])
+        Product.objects.create(
+            organization=self.organization,
+            name="Default threshold boundary",
+            sku="DEFAULT-BOUNDARY",
+            quantity_on_hand=5,
+        )
+        Product.objects.create(
+            organization=self.organization,
+            name="Own threshold boundary",
+            sku="OWN-BOUNDARY",
+            quantity_on_hand=3,
+            low_stock_threshold=3,
+        )
+        Product.objects.create(
+            organization=self.organization,
+            name="Above own threshold",
+            sku="OWN-ABOVE",
+            quantity_on_hand=4,
+            low_stock_threshold=3,
+        )
+
+        response = self.client.get(reverse("product_list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<table")
+        self.assertContains(response, "Default threshold boundary")
+        self.assertContains(response, "Own threshold boundary")
+        self.assertContains(response, "Above own threshold")
+        self.assertEqual(
+            response.context["products"].get(sku="DEFAULT-BOUNDARY").is_low_stock,
+            True,
+        )
+        self.assertEqual(
+            response.context["products"].get(sku="OWN-BOUNDARY").is_low_stock,
+            True,
+        )
+        self.assertEqual(
+            response.context["products"].get(sku="OWN-ABOVE").is_low_stock,
+            False,
+        )
+
+    def test_product_list_search_matches_name_or_sku_and_stays_organization_scoped(self):
+        Product.objects.create(
+            organization=self.organization, name="Green apple", sku="FRUIT-1"
+        )
+        Product.objects.create(
+            organization=self.organization, name="Desk lamp", sku="GREEN-2"
+        )
+        Product.objects.create(
+            organization=self.other_organization,
+            name="Green item",
+            sku="GREEN-3",
+        )
+
+        name_response = self.client.get(
+            reverse("product_list"), {"q": "green apple"}
+        )
+        sku_response = self.client.get(reverse("product_list"), {"q": "GREEN-2"})
+
+        self.assertContains(name_response, "Green apple")
+        self.assertNotContains(name_response, "Desk lamp")
+        self.assertNotContains(name_response, "Green item")
+        self.assertContains(sku_response, "Desk lamp")
+        self.assertNotContains(sku_response, "Green apple")
+        self.assertNotContains(sku_response, "Green item")
+
     def test_product_create_assigns_users_organization_and_ignores_submitted_id(self):
         response = self.client.post(
             reverse("product_create"),

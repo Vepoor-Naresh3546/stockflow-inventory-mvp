@@ -7,18 +7,46 @@
   <body>
     <h1>Products</h1>
     <p><a href="{% url 'product_create' %}">Add product</a></p>
+    <form method="get">
+      <label for="product-search">Search by name or SKU</label>
+      <input id="product-search" type="search" name="q" value="{{ search_query }}">
+      <button type="submit">Search</button>
+      {% if search_query %}<a href="{% url 'product_list' %}">Clear</a>{% endif %}
+    </form>
     {% if products %}
-      <ul>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">SKU</th>
+            <th scope="col">Quantity</th>
+            <th scope="col">Low-stock status</th>
+            <th scope="col">Selling price</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
         {% for product in products %}
-          <li>
-            {{ product.name }} — {{ product.sku }} ({{ product.quantity_on_hand }} on hand)
-            <a href="{% url 'product_edit' product.id %}">Edit</a>
-            <a href="{% url 'product_delete' product.id %}">Delete</a>
-          </li>
+          <tr>
+            <td>{{ product.name }}</td>
+            <td>{{ product.sku }}</td>
+            <td>{{ product.quantity_on_hand }}</td>
+            <td>{% if product.is_low_stock %}Low stock{% else %}In stock{% endif %}</td>
+            <td>{% if product.selling_price != None %}{{ product.selling_price }}{% else %}—{% endif %}</td>
+            <td>
+              <a href="{% url 'product_edit' product.id %}">Edit</a>
+              <a href="{% url 'product_delete' product.id %}">Delete</a>
+            </td>
+          </tr>
         {% endfor %}
-      </ul>
+        </tbody>
+      </table>
     {% else %}
-      <p>No products yet.</p>
+      {% if search_query %}
+        <p>No products match “{{ search_query }}”.</p>
+      {% else %}
+        <p>No products yet.</p>
+      {% endif %}
     {% endif %}
     <p><a href="{% url 'dashboard' %}">Dashboard</a></p>
   </body>

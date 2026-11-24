@@ -2,6 +2,7 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.db.models import BooleanField, Case, F, Q, Value, When
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import ProductForm, SignupForm
@@ -37,8 +38,33 @@ def dashboard(request):
 
 @login_required(login_url="login")
 def product_list(request):
-    products = Product.objects.filter(organization=request.user.organization)
-    return render(request, "inventory/product_list.html", {"products": products})
+    organization = request.user.organization
+    search_query = request.GET.get("q", "").strip()
+    products = Product.objects.filter(organization=organization)
+    if search_query:
+        products = products.filter(
+            Q(name__icontains=search_query) | Q(sku__icontains=search_query)
+        )
+    products = products.annotate(
+        is_low_stock=Case(
+            When(
+                low_stock_threshold__isnull=True,
+                quantity_on_hand__lte=organization.default_low_stock_threshold,
+                then=Value(True),
+            ),
+            When(
+                quantity_on_hand__lte=F("low_stock_threshold"),
+                then=Value(True),
+            ),
+            default=Value(False),
+            output_field=BooleanField(),
+        )
+    )
+    return render(
+        request,
+        "inventory/product_list.html",
+        {"products": products, "search_query": search_query},
+    )
 
 
 @login_required(login_url="login")

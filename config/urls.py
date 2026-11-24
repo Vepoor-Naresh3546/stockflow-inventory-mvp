@@ -22,6 +22,7 @@ from inventory.forms import EmailAuthenticationForm
 from inventory import views
 
 urlpatterns = [
+    path('', views.dashboard, name='home'),
     path('admin/', admin.site.urls),
     path('signup/', views.signup, name='signup'),
     path(

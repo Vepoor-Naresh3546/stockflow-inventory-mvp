@@ -67,6 +67,7 @@ class AuthenticationFlowTests(TestCase):
             email="owner@example.com",
             password="A-strong-password-42",
         )
+        Organization.objects.create(owner=self.user, name="Owner Org")
 
     def test_login_accepts_email_and_redirects_to_dashboard(self):
         response = self.client.post(
@@ -138,6 +139,61 @@ class ProductPageTests(TestCase):
             owner=other_user, name="Other Org"
         )
         self.client.force_login(self.user)
+
+    def test_dashboard_shows_organization_totals_and_low_stock_thresholds(self):
+        self.organization.default_low_stock_threshold = 5
+        self.organization.save(update_fields=["default_low_stock_threshold"])
+        Product.objects.create(
+            organization=self.organization,
+            name="Default threshold low",
+            sku="DEFAULT-LOW",
+            quantity_on_hand=5,
+        )
+        Product.objects.create(
+            organization=self.organization,
+            name="Own threshold low",
+            sku="OWN-LOW",
+            quantity_on_hand=2,
+            low_stock_threshold=2,
+        )
+        Product.objects.create(
+            organization=self.organization,
+            name="Above own threshold",
+            sku="OWN-OK",
+            quantity_on_hand=3,
+            low_stock_threshold=2,
+        )
+        Product.objects.create(
+            organization=self.other_organization,
+            name="Other organization product",
+            sku="OTHER-DASH",
+            quantity_on_hand=100,
+        )
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["product_count"], 3)
+        self.assertEqual(response.context["total_quantity"], 10)
+        self.assertContains(response, "Default threshold low")
+        self.assertContains(response, "Own threshold low")
+        self.assertNotContains(response, "Above own threshold")
+        self.assertNotContains(response, "Other organization product")
+        low_stock = list(response.context["low_stock_products"])
+        self.assertEqual(
+            [(product.sku, product.effective_threshold) for product in low_stock],
+            [("DEFAULT-LOW", 5), ("OWN-LOW", 2)],
+        )
+        self.assertContains(response, reverse("product_list"))
+
+    def test_dashboard_shows_zero_totals_and_helpful_empty_state(self):
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["product_count"], 0)
+        self.assertEqual(response.context["total_quantity"], 0)
+        self.assertContains(response, "You don’t have any products yet.")
+        self.assertContains(response, reverse("product_list"))
 
     def test_product_list_only_shows_current_organizations_products(self):
         Product.objects.create(

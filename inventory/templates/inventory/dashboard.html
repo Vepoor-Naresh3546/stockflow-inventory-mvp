@@ -6,7 +6,40 @@
   </head>
   <body>
     <h1>Dashboard</h1>
-    <p>Your inventory dashboard will appear here.</p>
+    <p>Total products: {{ product_count }}</p>
+    <p>Total quantity on hand: {{ total_quantity }}</p>
+    <p><a href="{% url 'product_list' %}">View products</a></p>
+
+    {% if product_count %}
+      <h2>Low-stock products</h2>
+      {% if low_stock_products %}
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">SKU</th>
+              <th scope="col">Quantity</th>
+              <th scope="col">Effective threshold</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for product in low_stock_products %}
+              <tr>
+                <td>{{ product.name }}</td>
+                <td>{{ product.sku }}</td>
+                <td>{{ product.quantity_on_hand }}</td>
+                <td>{{ product.effective_threshold }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p>No products are currently low on stock.</p>
+      {% endif %}
+    {% else %}
+      <p>You don’t have any products yet. Add a product to get started.</p>
+    {% endif %}
+
     <form method="post" action="{% url 'logout' %}">
       {% csrf_token %}
       <button type="submit">Log out</button>

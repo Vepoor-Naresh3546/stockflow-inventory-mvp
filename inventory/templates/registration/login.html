@@ -1,17 +1,27 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>Log in</title>
-  </head>
-  <body>
-    <h1>Log in</h1>
-    <form method="post">
+{% extends "inventory/base.html" %}
+
+{% block title %}Log in{% endblock %}
+
+{% block content %}
+  <section class="auth-card">
+    <p class="eyebrow">Welcome back</p>
+    <h1>Log in to StockFlow</h1>
+    <p class="auth-description">Manage your inventory with confidence.</p>
+    <form method="post" class="data-form">
       {% csrf_token %}
-      {{ form.as_p }}
+      {% if form.non_field_errors %}
+        <div class="form-errors" role="alert">{{ form.non_field_errors }}</div>
+      {% endif %}
+      {% for field in form %}
+        <div class="form-field{% if field.errors %} has-errors{% endif %}">
+          {{ field.label_tag }}
+          {{ field }}
+          {% if field.errors %}<div class="field-errors" role="alert">{{ field.errors }}</div>{% endif %}
+        </div>
+      {% endfor %}
       <input type="hidden" name="next" value="{{ next }}">
-      <button type="submit">Log in</button>
+      <button class="button button-primary button-full" type="submit">Log in</button>
     </form>
-    <p><a href="{% url 'signup' %}">Sign up</a></p>
-  </body>
-</html>
+    <p class="auth-switch">New to StockFlow? <a href="{% url 'signup' %}">Create an account</a></p>
+  </section>
+{% endblock %}

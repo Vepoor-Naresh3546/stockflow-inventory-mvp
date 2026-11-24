@@ -1,0 +1,38 @@
+{% extends "inventory/base.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">Workspace</p>
+      <h1>Organization settings</h1>
+      <p class="page-description">Update your organization details and inventory defaults.</p>
+    </div>
+  </section>
+  <section class="panel form-panel">
+    <div class="section-heading settings-heading">
+      <div>
+        <h2>General</h2>
+        <p class="field-help">These settings apply only to {{ organization.name }}.</p>
+      </div>
+    </div>
+    <form method="post" class="data-form">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="form-errors" role="alert">{{ form.non_field_errors }}</div>
+      {% endif %}
+      {% for field in form %}
+        <div class="form-field{% if field.errors %} has-errors{% endif %}">
+          {{ field.label_tag }}
+          {{ field }}
+          {% if field.help_text %}<small class="field-help">{{ field.help_text }}</small>{% endif %}
+          {% if field.errors %}<div class="field-errors" role="alert">{{ field.errors }}</div>{% endif %}
+        </div>
+      {% endfor %}
+      <div class="form-actions">
+        <button class="button button-primary" type="submit">Save settings</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}

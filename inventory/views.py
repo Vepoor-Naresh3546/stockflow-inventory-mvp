@@ -1,3 +1,4 @@
+from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
@@ -15,7 +16,7 @@ from django.db.models import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import ProductForm, SignupForm
+from .forms import OrganizationSettingsForm, ProductForm, SignupForm
 from .models import Organization, Product
 
 
@@ -71,16 +72,21 @@ def dashboard(request):
         product_count=Count("pk"),
         total_quantity=Sum("quantity_on_hand"),
     )
-    low_stock_products = annotate_stock_status(products, organization).filter(
-        is_low_stock=True
-    ).order_by("name")
+    low_stock_products = list(
+        annotate_stock_status(products, organization)
+        .filter(is_low_stock=True)
+        .order_by("name")
+    )
     return render(
         request,
         "inventory/dashboard.html",
         {
+            "organization": organization,
             "product_count": totals["product_count"],
             "total_quantity": totals["total_quantity"] or 0,
+            "low_stock_count": len(low_stock_products),
             "low_stock_products": low_stock_products,
+            "active_page": "dashboard",
         },
     )
 
@@ -98,7 +104,12 @@ def product_list(request):
     return render(
         request,
         "inventory/product_list.html",
-        {"products": products, "search_query": search_query},
+        {
+            "organization": organization,
+            "products": products,
+            "search_query": search_query,
+            "active_page": "products",
+        },
     )
 
 
@@ -118,7 +129,13 @@ def product_create(request):
     return render(
         request,
         "inventory/product_form.html",
-        {"form": form, "page_title": "Add product", "submit_label": "Save product"},
+        {
+            "form": form,
+            "page_title": "Add product",
+            "submit_label": "Save product",
+            "organization": organization,
+            "active_page": "add_product",
+        },
     )
 
 
@@ -146,6 +163,8 @@ def product_edit(request, product_id):
             "page_title": "Edit product",
             "submit_label": "Save changes",
             "product": product,
+            "organization": organization,
+            "active_page": "products",
         },
     )
 
@@ -162,5 +181,32 @@ def product_delete(request, product_id):
     return render(
         request,
         "inventory/product_confirm_delete.html",
-        {"product": product},
+        {
+            "product": product,
+            "organization": request.user.organization,
+            "active_page": "products",
+        },
+    )
+
+
+@login_required(login_url="login")
+def organization_settings(request):
+    organization = request.user.organization
+    if request.method == "POST":
+        form = OrganizationSettingsForm(request.POST, instance=organization)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Organization settings saved.")
+            return redirect("organization_settings")
+    else:
+        form = OrganizationSettingsForm(instance=organization)
+
+    return render(
+        request,
+        "inventory/organization_settings.html",
+        {
+            "form": form,
+            "organization": organization,
+            "active_page": "settings",
+        },
     )

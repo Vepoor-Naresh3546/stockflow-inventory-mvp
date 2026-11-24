@@ -1,10 +1,19 @@
 from django.contrib.auth.models import User
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from .models import Organization, Product
 
 
+TEST_STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"
+    },
+}
+
+
+@override_settings(STORAGES=TEST_STORAGES)
 class SignupTests(TestCase):
     def test_signup_creates_user_and_organization_and_logs_user_in(self):
         response = self.client.post(
@@ -60,6 +69,7 @@ class SignupTests(TestCase):
         self.assertIn("password2", response.context["form"].errors)
 
 
+@override_settings(STORAGES=TEST_STORAGES)
 class AuthenticationFlowTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -120,6 +130,7 @@ class AuthenticationFlowTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
 
+@override_settings(STORAGES=TEST_STORAGES)
 class ProductPageTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -175,6 +186,7 @@ class ProductPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["product_count"], 3)
         self.assertEqual(response.context["total_quantity"], 10)
+        self.assertEqual(response.context["low_stock_count"], 2)
         self.assertContains(response, "Default threshold low")
         self.assertContains(response, "Own threshold low")
         self.assertNotContains(response, "Above own threshold")
@@ -192,7 +204,9 @@ class ProductPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["product_count"], 0)
         self.assertEqual(response.context["total_quantity"], 0)
+        self.assertEqual(response.context["low_stock_count"], 0)
         self.assertContains(response, "You don’t have any products yet.")
+        self.assertContains(response, reverse("product_create"))
         self.assertContains(response, reverse("product_list"))
 
     def test_product_list_only_shows_current_organizations_products(self):
@@ -327,6 +341,79 @@ class ProductPageTests(TestCase):
             "A product with this SKU already exists in your organization.",
         )
 
+    def test_product_quantity_must_be_a_nonnegative_integer(self):
+        for quantity, sku in (("-1", "INVALID-NEG"), ("1.5", "INVALID-FRACTION")):
+            with self.subTest(quantity=quantity):
+                response = self.client.post(
+                    reverse("product_create"),
+                    {
+                        "name": "Invalid quantity",
+                        "sku": sku,
+                        "description": "",
+                        "quantity_on_hand": quantity,
+                        "cost_price": "",
+                        "selling_price": "",
+                        "low_stock_threshold": "",
+                    },
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertFalse(
+                    Product.objects.filter(
+                        organization=self.organization, sku=sku
+                    ).exists()
+                )
+                self.assertIn(
+                    "quantity_on_hand", response.context["form"].errors
+                )
+
+    def test_organization_settings_update_only_current_users_organization(self):
+        response = self.client.post(
+            reverse("organization_settings"),
+            {
+                "name": "Renamed Owner Org",
+                "default_low_stock_threshold": "8",
+                "organization": str(self.other_organization.pk),
+            },
+        )
+
+        self.assertRedirects(response, reverse("organization_settings"))
+        self.organization.refresh_from_db()
+        self.other_organization.refresh_from_db()
+        self.assertEqual(self.organization.name, "Renamed Owner Org")
+        self.assertEqual(self.organization.default_low_stock_threshold, 8)
+        self.assertEqual(self.other_organization.name, "Other Org")
+        self.assertEqual(self.other_organization.default_low_stock_threshold, 5)
+
+    def test_organization_settings_reject_invalid_values_without_saving(self):
+        response = self.client.post(
+            reverse("organization_settings"),
+            {"name": "", "default_low_stock_threshold": "-1"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.organization.refresh_from_db()
+        self.assertEqual(self.organization.name, "Owner Org")
+        self.assertEqual(self.organization.default_low_stock_threshold, 5)
+        self.assertIn("name", response.context["form"].errors)
+        self.assertIn(
+            "default_low_stock_threshold", response.context["form"].errors
+        )
+
+    def test_organization_settings_post_requires_csrf_token(self):
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.user)
+
+        response = csrf_client.post(
+            reverse("organization_settings"),
+            {"name": "CSRF update", "default_low_stock_threshold": "8"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.organization.refresh_from_db()
+        self.assertEqual(self.organization.name, "Owner Org")
+        self.assertEqual(self.organization.default_low_stock_threshold, 5)
+
     def test_product_pages_require_login_and_include_csrf(self):
         self.client.logout()
         product = Product.objects.create(
@@ -335,6 +422,7 @@ class ProductPageTests(TestCase):
         protected_urls = [
             reverse("product_list"),
             reverse("product_create"),
+            reverse("organization_settings"),
             reverse("product_edit", args=[product.pk]),
             reverse("product_delete", args=[product.pk]),
         ]
@@ -348,6 +436,8 @@ class ProductPageTests(TestCase):
 
         self.client.force_login(self.user)
         response = self.client.get(reverse("product_create"))
+        self.assertContains(response, 'name="csrfmiddlewaretoken"')
+        response = self.client.get(reverse("organization_settings"))
         self.assertContains(response, 'name="csrfmiddlewaretoken"')
 
     def test_product_edit_updates_only_the_current_organizations_product(self):

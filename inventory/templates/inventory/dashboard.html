@@ -1,48 +1,82 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>Dashboard</title>
-  </head>
-  <body>
-    <h1>Dashboard</h1>
-    <p>Total products: {{ product_count }}</p>
-    <p>Total quantity on hand: {{ total_quantity }}</p>
-    <p><a href="{% url 'product_list' %}">View products</a></p>
+{% extends "inventory/base.html" %}
 
-    {% if product_count %}
-      <h2>Low-stock products</h2>
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+  <section class="page-heading">
+    <div>
+      <p class="eyebrow">Overview</p>
+      <h1>Dashboard</h1>
+      <p class="page-description">A clear view of your inventory at a glance.</p>
+    </div>
+    <a class="button button-primary" href="{% url 'product_create' %}">＋ Add product</a>
+  </section>
+
+  <section class="metric-grid" aria-label="Inventory summary">
+    <article class="metric-card">
+      <span class="metric-label">Total products</span>
+      <strong class="metric-value">{{ product_count }}</strong>
+      <span class="metric-note">Unique items in your catalog</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Total stock quantity</span>
+      <strong class="metric-value">{{ total_quantity }}</strong>
+      <span class="metric-note">Units currently on hand</span>
+    </article>
+    <article class="metric-card metric-card-alert">
+      <span class="metric-label">Low-stock products</span>
+      <strong class="metric-value">{{ low_stock_count }}</strong>
+      <span class="metric-note">At or below their stock threshold</span>
+    </article>
+  </section>
+
+  {% if product_count %}
+    <section class="panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Needs attention</p>
+          <h2>Low-stock products</h2>
+        </div>
+        <a class="text-link" href="{% url 'product_list' %}">View all products <span aria-hidden="true">→</span></a>
+      </div>
       {% if low_stock_products %}
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">SKU</th>
-              <th scope="col">Quantity</th>
-              <th scope="col">Effective threshold</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for product in low_stock_products %}
+        <div class="table-scroll">
+          <table>
+            <thead>
               <tr>
-                <td>{{ product.name }}</td>
-                <td>{{ product.sku }}</td>
-                <td>{{ product.quantity_on_hand }}</td>
-                <td>{{ product.effective_threshold }}</td>
+                <th scope="col">Product</th>
+                <th scope="col">SKU</th>
+                <th scope="col">Quantity</th>
+                <th scope="col">Effective threshold</th>
               </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {% for product in low_stock_products %}
+                <tr>
+                  <td class="product-name">{{ product.name }}</td>
+                  <td class="sku-cell">{{ product.sku }}</td>
+                  <td>{{ product.quantity_on_hand }}</td>
+                  <td>{{ product.effective_threshold }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       {% else %}
-        <p>No products are currently low on stock.</p>
+        <div class="inline-empty">
+          <span class="status-dot status-dot-ok" aria-hidden="true"></span>
+          <p>No products are currently low on stock.</p>
+        </div>
       {% endif %}
-    {% else %}
+    </section>
+  {% else %}
+    <section class="panel empty-state">
+      <span class="empty-state-icon" aria-hidden="true">▤</span>
+      <p class="eyebrow">Get started</p>
+      <h2>Your inventory starts here</h2>
       <p>You don’t have any products yet. Add a product to get started.</p>
-    {% endif %}
-
-    <form method="post" action="{% url 'logout' %}">
-      {% csrf_token %}
-      <button type="submit">Log out</button>
-    </form>
-  </body>
-</html>
+      <a class="button button-primary" href="{% url 'product_create' %}">Add your first product</a>
+      <a class="text-link empty-secondary-link" href="{% url 'product_list' %}">View products</a>
+    </section>
+  {% endif %}
+{% endblock %}

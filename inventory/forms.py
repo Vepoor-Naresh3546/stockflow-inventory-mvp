@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
-from .models import Product
+from .models import Organization, Product
 
 
 class SignupForm(forms.Form):
@@ -82,3 +82,18 @@ class ProductForm(forms.ModelForm):
                 "A product with this SKU already exists in your organization."
             )
         return sku
+
+
+class OrganizationSettingsForm(forms.ModelForm):
+    class Meta:
+        model = Organization
+        fields = ["name", "default_low_stock_threshold"]
+        labels = {
+            "name": "Organization name",
+            "default_low_stock_threshold": "Default low-stock threshold",
+        }
+        help_texts = {
+            "default_low_stock_threshold": (
+                "Products without their own threshold use this quantity."
+            ),
+        }

@@ -1,0 +1,73 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}StockFlow{% endblock %} · StockFlow</title>
+    <link rel="stylesheet" href="{% static 'inventory/app.css' %}">
+  </head>
+  <body class="{% if user.is_authenticated %}app-body{% else %}auth-body{% endif %}">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    {% if user.is_authenticated %}
+      <div class="app-shell">
+        <aside class="sidebar" aria-label="Main navigation">
+          <a class="brand" href="{% url 'dashboard' %}">
+            <span class="brand-mark" aria-hidden="true">S</span>
+            <span>StockFlow</span>
+          </a>
+          <div class="workspace-label">
+            <span class="workspace-avatar" aria-hidden="true">{{ organization.name|first|upper }}</span>
+            <span class="workspace-name">{{ organization.name }}</span>
+          </div>
+          <nav class="primary-nav">
+            <a class="nav-link{% if active_page == 'dashboard' %} is-active{% endif %}" href="{% url 'dashboard' %}"{% if active_page == 'dashboard' %} aria-current="page"{% endif %}>
+              <span class="nav-icon" aria-hidden="true">⌂</span>Dashboard
+            </a>
+            <a class="nav-link{% if active_page == 'products' %} is-active{% endif %}" href="{% url 'product_list' %}"{% if active_page == 'products' %} aria-current="page"{% endif %}>
+              <span class="nav-icon" aria-hidden="true">▤</span>Products
+            </a>
+            <a class="nav-link{% if active_page == 'add_product' %} is-active{% endif %}" href="{% url 'product_create' %}"{% if active_page == 'add_product' %} aria-current="page"{% endif %}>
+              <span class="nav-icon" aria-hidden="true">＋</span>Add product
+            </a>
+            <a class="nav-link{% if active_page == 'settings' %} is-active{% endif %}" href="{% url 'organization_settings' %}"{% if active_page == 'settings' %} aria-current="page"{% endif %}>
+              <span class="nav-icon" aria-hidden="true">⚙</span>Settings
+            </a>
+          </nav>
+          <div class="sidebar-footer">
+            <div class="user-summary">
+              <span class="user-avatar" aria-hidden="true">{{ user.email|first|upper }}</span>
+              <span class="user-email">{{ user.email }}</span>
+            </div>
+            <form method="post" action="{% url 'logout' %}">
+              {% csrf_token %}
+              <button class="nav-link logout-link" type="submit">
+                <span class="nav-icon" aria-hidden="true">↪</span>Log out
+              </button>
+            </form>
+          </div>
+        </aside>
+        <div class="main-column">
+          <header class="topbar">
+            <a class="mobile-brand" href="{% url 'dashboard' %}">StockFlow</a>
+            <span class="topbar-context">{{ organization.name }} <span aria-hidden="true">/</span> Inventory</span>
+          </header>
+          <main class="main-content" id="main-content">
+    {% else %}
+      <main class="auth-layout" id="main-content">
+        <a class="brand auth-brand" href="{% url 'login' %}">
+          <span class="brand-mark" aria-hidden="true">S</span>
+          <span>StockFlow</span>
+        </a>
+    {% endif %}
+            {% include "inventory/includes/messages.html" %}
+            {% block content %}{% endblock %}
+    {% if user.is_authenticated %}
+          </main>
+        </div>
+      </div>
+    {% else %}
+      </main>
+    {% endif %}
+  </body>
+</html>

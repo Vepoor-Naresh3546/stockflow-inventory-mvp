@@ -154,6 +154,8 @@ class ProductPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "My product")
         self.assertNotContains(response, "Other product")
+        self.assertContains(response, reverse("product_edit", args=[Product.objects.get(sku="MY-1").pk]))
+        self.assertContains(response, reverse("product_delete", args=[Product.objects.get(sku="MY-1").pk]))
 
     def test_product_create_assigns_users_organization_and_ignores_submitted_id(self):
         response = self.client.post(
@@ -202,14 +204,92 @@ class ProductPageTests(TestCase):
 
     def test_product_pages_require_login_and_include_csrf(self):
         self.client.logout()
-        for route in ("product_list", "product_create"):
-            with self.subTest(route=route):
-                response = self.client.get(reverse(route))
+        product = Product.objects.create(
+            organization=self.organization, name="Protected", sku="PROTECTED-1"
+        )
+        protected_urls = [
+            reverse("product_list"),
+            reverse("product_create"),
+            reverse("product_edit", args=[product.pk]),
+            reverse("product_delete", args=[product.pk]),
+        ]
+        for url in protected_urls:
+            with self.subTest(url=url):
+                response = self.client.get(url)
                 self.assertRedirects(
                     response,
-                    f"{reverse('login')}?next={reverse(route)}",
+                    f"{reverse('login')}?next={url}",
                 )
 
         self.client.force_login(self.user)
         response = self.client.get(reverse("product_create"))
         self.assertContains(response, 'name="csrfmiddlewaretoken"')
+
+    def test_product_edit_updates_only_the_current_organizations_product(self):
+        product = Product.objects.create(
+            organization=self.organization, name="Old name", sku="EDIT-1"
+        )
+
+        response = self.client.post(
+            reverse("product_edit", args=[product.pk]),
+            {
+                "name": "Updated name",
+                "sku": "EDIT-1",
+                "description": "Updated",
+                "quantity_on_hand": "3",
+                "cost_price": "",
+                "selling_price": "",
+                "low_stock_threshold": "",
+                "organization": str(self.other_organization.pk),
+            },
+        )
+
+        self.assertRedirects(response, reverse("product_list"))
+        product.refresh_from_db()
+        self.assertEqual(product.name, "Updated name")
+        self.assertEqual(product.organization, self.organization)
+
+    def test_edit_and_delete_cannot_access_another_organizations_product(self):
+        product = Product.objects.create(
+            organization=self.other_organization,
+            name="Other product",
+            sku="OTHER-2",
+        )
+
+        edit_response = self.client.get(
+            reverse("product_edit", args=[product.pk])
+        )
+        delete_response = self.client.get(
+            reverse("product_delete", args=[product.pk])
+        )
+        delete_post_response = self.client.post(
+            reverse("product_delete", args=[product.pk])
+        )
+
+        self.assertEqual(edit_response.status_code, 404)
+        self.assertEqual(delete_response.status_code, 404)
+        self.assertEqual(delete_post_response.status_code, 404)
+        self.assertTrue(Product.objects.filter(pk=product.pk).exists())
+
+    def test_delete_requires_confirmation_and_post(self):
+        product = Product.objects.create(
+            organization=self.organization, name="To delete", sku="DELETE-1"
+        )
+        delete_url = reverse("product_delete", args=[product.pk])
+
+        response = self.client.get(delete_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Are you sure")
+        self.assertContains(response, 'name="csrfmiddlewaretoken"')
+        self.assertTrue(Product.objects.filter(pk=product.pk).exists())
+
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.user)
+        response = csrf_client.post(delete_url)
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Product.objects.filter(pk=product.pk).exists())
+
+        response = self.client.post(delete_url)
+        self.assertRedirects(response, reverse("product_list"))
+        self.assertFalse(Product.objects.filter(pk=product.pk).exists())

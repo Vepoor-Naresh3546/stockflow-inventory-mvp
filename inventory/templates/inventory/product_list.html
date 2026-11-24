@@ -10,7 +10,11 @@
     {% if products %}
       <ul>
         {% for product in products %}
-          <li>{{ product.name }} — {{ product.sku }} ({{ product.quantity_on_hand }} on hand)</li>
+          <li>
+            {{ product.name }} — {{ product.sku }} ({{ product.quantity_on_hand }} on hand)
+            <a href="{% url 'product_edit' product.id %}">Edit</a>
+            <a href="{% url 'product_delete' product.id %}">Delete</a>
+          </li>
         {% endfor %}
       </ul>
     {% else %}

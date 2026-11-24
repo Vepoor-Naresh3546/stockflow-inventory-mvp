@@ -2,7 +2,7 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import ProductForm, SignupForm
 from .models import Organization, Product
@@ -54,4 +54,52 @@ def product_create(request):
     else:
         form = ProductForm(organization=organization)
 
-    return render(request, "inventory/product_form.html", {"form": form})
+    return render(
+        request,
+        "inventory/product_form.html",
+        {"form": form, "page_title": "Add product", "submit_label": "Save product"},
+    )
+
+
+@login_required(login_url="login")
+def product_edit(request, product_id):
+    organization = request.user.organization
+    product = get_object_or_404(
+        Product, pk=product_id, organization=organization
+    )
+    if request.method == "POST":
+        form = ProductForm(
+            request.POST, instance=product, organization=organization
+        )
+        if form.is_valid():
+            form.save()
+            return redirect("product_list")
+    else:
+        form = ProductForm(instance=product, organization=organization)
+
+    return render(
+        request,
+        "inventory/product_form.html",
+        {
+            "form": form,
+            "page_title": "Edit product",
+            "submit_label": "Save changes",
+            "product": product,
+        },
+    )
+
+
+@login_required(login_url="login")
+def product_delete(request, product_id):
+    product = get_object_or_404(
+        Product, pk=product_id, organization=request.user.organization
+    )
+    if request.method == "POST":
+        product.delete()
+        return redirect("product_list")
+
+    return render(
+        request,
+        "inventory/product_confirm_delete.html",
+        {"product": product},
+    )

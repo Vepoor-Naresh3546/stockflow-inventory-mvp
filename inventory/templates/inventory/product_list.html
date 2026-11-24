@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Products</title>
+  </head>
+  <body>
+    <h1>Products</h1>
+    <p><a href="{% url 'product_create' %}">Add product</a></p>
+    {% if products %}
+      <ul>
+        {% for product in products %}
+          <li>{{ product.name }} — {{ product.sku }} ({{ product.quantity_on_hand }} on hand)</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No products yet.</p>
+    {% endif %}
+    <p><a href="{% url 'dashboard' %}">Dashboard</a></p>
+  </body>
+</html>

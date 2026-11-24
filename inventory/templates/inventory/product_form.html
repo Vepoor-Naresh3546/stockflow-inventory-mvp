@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Add product</title>
+  </head>
+  <body>
+    <h1>Add product</h1>
+    <form method="post">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div role="alert">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+      {% for field in form %}
+        <p>
+          {{ field.label_tag }}
+          {{ field }}
+          {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+          {% if field.errors %}<span role="alert">{{ field.errors }}</span>{% endif %}
+        </p>
+      {% endfor %}
+      <button type="submit">Save product</button>
+    </form>
+    <p><a href="{% url 'product_list' %}">Back to products</a></p>
+  </body>
+</html>
